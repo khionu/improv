@@ -14,7 +14,7 @@ pub use result::{ActorErr, ActorOk, ActorResult};
 mod result;
 
 #[cfg(tokio_impl)]
-mod tokio_impl;
+pub mod tokio_impl;
 
 /// This is the reference that should be cloned and passed around.
 /// Anything that needs to send to an Actor should have a clone of
@@ -61,7 +61,7 @@ pub trait Actor: Send + Sync {
 /// The internal driver for the ActorSystem. This defines threading
 /// and storage implementations.
 pub trait ActorSystemDriver {
-    fn register<T>(&self, actor: T) -> (ActorRef<T>, Option<T::Err>) where
+    fn register<T>(&self, mut actor: T) -> (ActorRef<T>, Option<T::Err>) where
         T: Actor + 'static;
     fn is_running(&self) -> Arc<AtomicBool>;
     fn stop(&self);
