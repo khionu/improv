@@ -132,3 +132,11 @@ impl<T: ActorSystemDriver> ActorSystem<T> {
         self.inner.register(actor)
     }
 }
+
+impl<T: ActorSystemDriver> Default for ActorSystem<T> where
+    T: Default
+{
+    fn default() -> Self {
+        ActorSystem::new(T::default())
+    }
+}
