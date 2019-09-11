@@ -17,3 +17,7 @@ of your choice.
 3) Run `ActorSystem::register` to start your `Actor`.  
 4) Use the returned `ActorRef<YourActor>` to send messages to
 your `YourActor`.
+
+## Planned features
+- Monitors  
+- Async traits (blocked)  
