@@ -12,6 +12,7 @@ use futures::channel::mpsc::UnboundedSender;
 pub use result::{ActorErr, ActorOk, ActorResult};
 
 mod result;
+mod utils;
 
 #[cfg(tokio_impl)]
 pub mod tokio_impl;

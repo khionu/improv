@@ -12,40 +12,21 @@ use futures::channel::mpsc::unbounded;
 use futures::StreamExt;
 
 use crate::{Actor, ActorErr, ActorOk, ActorRef, ActorResult, ActorState, ActorSystemDriver};
+use crate::utils::SnowflakeProducer;
 
 /// ActorSystemDriver implementation that uses the user's
 /// Tokio runtime to spawn Actors and run them asynchronously
+#[derive(Default)]
 pub struct TokioActorDriver {
-    sf_epoch: Instant,
-    sf_increment: AtomicU16,
+    snowflakes: SnowflakeProducer,
     is_running: Arc<AtomicBool>,
-}
-
-impl TokioActorDriver {
-    // TODO: Move to generic utility
-    fn generate_snowflake(&self) -> u64 {
-        let inc = self.sf_increment.fetch_add(1, Ordering::Acquire);
-        let dur = Instant::now().duration_since(self.sf_epoch).as_millis() as u64;
-
-        ((dur << 16) | inc as u64)
-    }
-}
-
-impl Default for TokioActorDriver {
-    fn default() -> Self {
-        Self {
-            sf_epoch: Instant::now(),
-            sf_increment: AtomicU16::new(0),
-            is_running: Arc::new(Default::default()),
-        }
-    }
 }
 
 impl ActorSystemDriver for TokioActorDriver {
     fn register<T>(&self, mut actor: T) -> (ActorRef<T>, Option<T::Err>) where
         T: Actor + 'static
     {
-        let id = self.generate_snowflake();
+        let id = self.snowflakes.produce();
 
         let (tx, mut rx) = unbounded::<T::Msg>();
 
