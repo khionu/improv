@@ -7,6 +7,7 @@ use std::{
     },
 };
 
+use async_trait::async_trait;
 use futures::channel::mpsc::UnboundedSender;
 
 pub use result::{ActorErr, ActorOk, ActorResult};
@@ -42,21 +43,22 @@ pub enum ActorState {
 }
 
 /// The Actor Trait.
+#[async_trait]
 pub trait Actor: Send + Sync {
     type Msg: Send + Sync;
     type Err: Error + Send + Sync;
 
     /// This is ran synchronously after an Actor is given
     /// to the ActorSystem.
-    fn start(&mut self) -> ActorResult<Self::Err> { Ok(ActorOk::Success) }
+    async fn start(&mut self) -> ActorResult<Self::Err> { Ok(ActorOk::Success) }
 
     /// The handle that the ActorSystem invokes when a message is
     /// sent to the Actor. This will get wrapped in an ActorFuture
-    fn handle(&mut self, msg: Self::Msg) -> ActorResult<Self::Err>;
+    async fn handle(&mut self, msg: Self::Msg) -> ActorResult<Self::Err>;
 
     /// This is ran synchronously on request through the ActorSystem.
     /// It will be blocked by any current message handles.
-    fn stop(&mut self) -> ActorResult<Self::Err> { Ok(ActorOk::GracefulEnd) }
+    async fn stop(&mut self) -> ActorResult<Self::Err> { Ok(ActorOk::GracefulEnd) }
 }
 
 /// The internal driver for the ActorSystem. This defines threading
