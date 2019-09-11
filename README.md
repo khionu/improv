@@ -6,9 +6,8 @@ objective of this crate is to provide the concurrency benefits of the
 Actor Model in Rust.
 
 This crate is comprised of traits for custom implementations of 
-threading, with a little concrete glue, as well as pre-made 
-implementations: Tokio, Rayon, and a rudimentary std impl using 
-`thread::spawn`. Focus will be on getting Tokio working.
+threading, with a little concrete glue, as well as a pre-made Tokio
+implementation. 
 
 Using this crate should be as simple as these few steps:  
 1) Initialize an `ActorSystem` with the Driver implementation
@@ -22,13 +21,12 @@ your `YourActor`.
 - Monitors  
 - Async traits (blocked)  
 
-
 ## License
 
 Licensed under either of
 
- * Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
- * MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+- Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+- MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
 
 at your option.
 
