@@ -15,7 +15,7 @@ pub use result::{ActorErr, ActorOk, ActorResult};
 mod result;
 mod utils;
 
-#[cfg(tokio_impl)]
+#[cfg(feature = tokio_impl)]
 pub mod tokio_impl;
 
 /// This is the reference that should be cloned and passed around.
