@@ -21,7 +21,7 @@ pub mod tokio_impl;
 /// This is the reference that should be cloned and passed around.
 /// Anything that needs to send to an Actor should have a clone of
 /// the corresponding ActorRef<T>.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct ActorRef<T: Actor + 'static> {
     id: u64,
     r#type: TypeId, // TODO: Is this still needed?
@@ -132,6 +132,17 @@ impl<T: ActorSystemDriver> ActorSystem<T> {
     /// any error returned by Actor::start
     pub async fn register<A: Actor + 'static>(&self, actor: A) -> (ActorRef<A>, Option<A::Err>) {
         self.inner.register(actor).await
+    }
+}
+
+impl<T: Actor + 'static> Clone for ActorRef<T> {
+    fn clone(&self) -> Self {
+        ActorRef {
+            id: self.id,
+            r#type: self.r#type,
+            tx: self.tx.clone(),
+            state: self.state.clone(),
+        }
     }
 }
 
