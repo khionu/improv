@@ -82,9 +82,7 @@ impl ActorSystemDriver for TokioActorDriver {
 
 async fn dequeue_for_actor<T: Actor + 'static>(mut actor: T, state: Arc<RwLock<ActorState>>,
                                      mut rx: UnboundedReceiver<T::Msg>, is_running: Arc<AtomicBool>) {
-    loop {
-        if !is_running.load(Ordering::Relaxed) { break; }
-
+    while is_running.load(Ordering::Relaxed) {
         if let Some(msg) = rx.next().await {
             {
                 let state_g = state.read()
