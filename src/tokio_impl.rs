@@ -1,17 +1,19 @@
 use std::{
     any::TypeId,
-    collections::HashMap,
     sync::{
-        Arc, atomic::{AtomicBool, AtomicU16, Ordering},
+        Arc, atomic::{AtomicBool, Ordering},
         RwLock,
     },
-    time::Instant,
 };
 
-use futures::channel::mpsc::unbounded;
+use async_trait::async_trait;
+use futures::channel::mpsc::{
+    unbounded,
+    UnboundedReceiver,
+};
 use futures::StreamExt;
 
-use crate::{Actor, ActorErr, ActorOk, ActorRef, ActorResult, ActorState, ActorSystemDriver};
+use crate::{Actor, ActorErr, ActorOk, ActorRef, ActorState, ActorSystemDriver};
 use crate::utils::SnowflakeProducer;
 
 /// ActorSystemDriver implementation that uses the user's
@@ -22,15 +24,16 @@ pub struct TokioActorDriver {
     is_running: Arc<AtomicBool>,
 }
 
+#[async_trait]
 impl ActorSystemDriver for TokioActorDriver {
-    fn register<T>(&self, mut actor: T) -> (ActorRef<T>, Option<T::Err>) where
+    async fn register<T>(&self, mut actor: T) -> (ActorRef<T>, Option<T::Err>) where
         T: Actor + 'static
     {
         let id = self.snowflakes.produce();
 
-        let (tx, mut rx) = unbounded::<T::Msg>();
+        let (tx, rx) = unbounded::<T::Msg>();
 
-        let (state, err) = match actor.start() {
+        let (state, err) = match actor.start().await {
             Ok(ok) => {
                 match ok {
                     ActorOk::Success => (ActorState::Healthy, None),
@@ -55,35 +58,14 @@ impl ActorSystemDriver for TokioActorDriver {
             state: state.clone(),
         };
 
-        if *state.read().unwrap() == ActorState::Healthy {
+        let state_g = state.read().unwrap();
+
+        if *state_g == ActorState::Healthy {
             let running = self.is_running.clone();
-            tokio::spawn(async move {
-                loop {
-                    if !running.load(Ordering::Relaxed) { break; }
 
-                    if let Some(msg) = rx.next().await {
-                        let mut state = state.write()
-                            .expect("poisoned actor_state, report to dev");
+            drop(state_g);
 
-                        if *state != ActorState::Healthy {
-                            break;
-                        }
-
-                        match actor.handle(msg) {
-                            Ok(ok) => {
-                                if ok == ActorOk::GracefulEnd {
-                                    *state = ActorState::Stopped;
-                                }
-                            }
-                            Err(err) => {
-                                if let ActorErr::Crashing(e) = err {
-                                    *state = ActorState::Crashed;
-                                }
-                            }
-                        }
-                    } else { break; }
-                }
-            });
+            tokio::spawn(dequeue_for_actor(actor, state, rx, running));
         }
 
         (actor_ref, err)
@@ -95,5 +77,43 @@ impl ActorSystemDriver for TokioActorDriver {
 
     fn stop(&self) {
         self.is_running.swap(false, Ordering::Acquire);
+    }
+}
+
+async fn dequeue_for_actor<T: Actor + 'static>(mut actor: T, state: Arc<RwLock<ActorState>>,
+                                     mut rx: UnboundedReceiver<T::Msg>, is_running: Arc<AtomicBool>) {
+    loop {
+        if !is_running.load(Ordering::Relaxed) { break; }
+
+        if let Some(msg) = rx.next().await {
+            {
+                let state_g = state.read()
+                    .expect("poisoned actor_state, report to dev");
+
+                if *state_g != ActorState::Healthy {
+                    break;
+                }
+            }
+
+            let handle_result = actor.handle(msg).await;
+
+            {
+                let mut state_g = state.write()
+                    .expect("poisoned actor_state, report to dev");
+
+                match handle_result {
+                    Ok(ok) => {
+                        if ok == ActorOk::GracefulEnd {
+                            *state_g = ActorState::Stopped;
+                        }
+                    }
+                    Err(err) => {
+                        if let ActorErr::Crashing(_e) = err {
+                            *state_g = ActorState::Crashed;
+                        }
+                    }
+                }
+            }
+        } else { break; }
     }
 }

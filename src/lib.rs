@@ -15,17 +15,16 @@ pub use result::{ActorErr, ActorOk, ActorResult};
 mod result;
 mod utils;
 
-#[cfg(feature = tokio_impl)]
+#[cfg(feature = "tokio_impl")]
 pub mod tokio_impl;
 
 /// This is the reference that should be cloned and passed around.
 /// Anything that needs to send to an Actor should have a clone of
 /// the corresponding ActorRef<T>.
 #[derive(Clone, Debug)]
-pub struct ActorRef<T: Actor> {
+pub struct ActorRef<T: Actor + 'static> {
     id: u64,
-    r#type: TypeId,
-    // TODO: Is this still needed?
+    r#type: TypeId, // TODO: Is this still needed?
     tx: Arc<UnboundedSender<T::Msg>>,
     state: Arc<RwLock<ActorState>>, // TODO: Should I use AtomicU8 instead?
 }
@@ -63,8 +62,9 @@ pub trait Actor: Send + Sync {
 
 /// The internal driver for the ActorSystem. This defines threading
 /// and storage implementations.
+#[async_trait]
 pub trait ActorSystemDriver {
-    fn register<T>(&self, mut actor: T) -> (ActorRef<T>, Option<T::Err>) where
+    async fn register<T>(&self, mut actor: T) -> (ActorRef<T>, Option<T::Err>) where
         T: Actor + 'static;
     fn is_running(&self) -> Arc<AtomicBool>;
     fn stop(&self);
@@ -78,7 +78,7 @@ pub struct ActorSystem<T: ActorSystemDriver + Sized> {
     inner: Arc<T>,
 }
 
-impl<T: Actor> ActorRef<T> {
+impl<T: Actor + 'static> ActorRef<T> {
     /// Send a message to the Actor to handle
     pub fn send(&self, msg: T::Msg) -> Result<(), ActorState> {
         let g = self.state.read()
@@ -95,13 +95,13 @@ impl<T: Actor> ActorRef<T> {
     }
 }
 
-impl<T: Actor> PartialEq for ActorRef<T> {
+impl<T: Actor + 'static> PartialEq for ActorRef<T> {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
 
-impl<T: Actor> Eq for ActorRef<T> {}
+impl<T: Actor + 'static> Eq for ActorRef<T> {}
 
 impl<T: ActorSystemDriver> ActorSystem<T> {
     pub fn new(driver: T) -> Self {
@@ -130,8 +130,8 @@ impl<T: ActorSystemDriver> ActorSystem<T> {
     ///
     /// Returns the ActorRef handle and an Option with
     /// any error returned by Actor::start
-    pub fn register<A: Actor + 'static>(&self, actor: A) -> (ActorRef<A>, Option<A::Err>) {
-        self.inner.register(actor)
+    pub async fn register<A: Actor + 'static>(&self, actor: A) -> (ActorRef<A>, Option<A::Err>) {
+        self.inner.register(actor).await
     }
 }
 
